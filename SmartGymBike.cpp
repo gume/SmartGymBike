@@ -1,19 +1,9 @@
 #include "SmartGymBike.h"
+#include "Button.h"
 
-SmartGymBike::SmartGymBike() {
-
-  // Setup button pad
-  pinMode(BTN_G1, OUTPUT);
-  pinMode(BTN_G2, OUTPUT);
-  digitalWrite(BTN_G1, LOW);
-  digitalWrite(BTN_G2, LOW);
-
-  pinMode(BTN_Q, INPUT_PULLUP);
-  pinMode(BTN_P, INPUT_PULLUP);
-  pinMode(BTN_S, INPUT_PULLUP);
-  pinMode(BTN_E, INPUT_PULLUP);
-  pinMode(BTN_D, INPUT_PULLUP);
-  pinMode(BTN_U, INPUT_PULLUP);
+SmartGymBike::SmartGymBike() :
+  buttonUp(PIN_BTNU), buttonDown(PIN_BTND), buttonSS(PIN_BTNS),
+  buttonUser(PIN_BTNQ), buttonEnter(PIN_BTNE), buttonPulse(PIN_BTNP) {
 
   // Setup level controller
   pinMode(PIN_MP, OUTPUT);
@@ -22,19 +12,15 @@ SmartGymBike::SmartGymBike() {
   digitalWrite(PIN_MN, LOW);
 
   // Setup level sensor
-  pinMode(PIN_POSVCC, OUTPUT);
-  pinMode(PIN_POSGND, OUTPUT);
-  pinMode(PIN_POS, INPUT);
-  digitalWrite(PIN_POSVCC, HIGH);
-  digitalWrite(PIN_POSGND, LOW);
+  //pinMode(PIN_POS, INPUT);
 
   targetLevel = analogRead(PIN_POS);
   targetReached = true;
 
   // Setup cadence sensor
   pinMode(PIN_SPEED, INPUT_PULLUP);
-  pinMode(PIN_SPEEDGND, OUTPUT);
-  digitalWrite(PIN_SPEEDGND, LOW);
+  //pinMode(PIN_SPEEDGND, OUTPUT);
+  //digitalWrite(PIN_SPEEDGND, LOW);
 
   cadenceMeter.reset();
   lastLoop = 0;
@@ -132,12 +118,12 @@ void SmartGymBike::doLoop() {
   //  if (targetLevel - mpos > 100) targetReached = false;
   //  if (mpos - targetLevel > 100) targetReached = false;
   //}
-}
 
-bool SmartGymBike::buttonPressed() {
-  return (testButton(BUTTON_UP) || testButton(BUTTON_DOWN));
-}
-
-bool SmartGymBike::testButton(int pin) {
-  return digitalRead(pin) == LOW;
+  // Check buttons
+  buttonUp.check();
+  buttonDown.check();
+  buttonSS.check();
+  buttonUser.check();
+  buttonPulse.check();
+  buttonEnter.check();
 }

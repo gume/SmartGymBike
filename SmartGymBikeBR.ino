@@ -2,7 +2,10 @@
 #include <ArduinoJson.h>
 #include "SmartGymBike.h"
 #include <IotWebConf.h>
-#include <Restfully.h>
+
+#include <WS2812FX.h>
+#include "ESP32_RMT_Driver.h"
+
 
 // -- Initial name of the Thing. SSID of the own Access Point.
 const char thingName[] = "Szmardzsimbájk";
@@ -22,7 +25,8 @@ MQTTClient mqttClient;
 SmartGymBike bike;
 WebServer server(80);
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
-RestRequestHandler restHandler;
+//RestRequestHandler restHandler;
+WS2812FX ws2812fx = WS2812FX(3, 25, NEO_GRB  + NEO_KHZ800); // 3 RGB LEDs driven by GPIO_25
 
 #define STRING_LEN 128
 char mqttServerValue[STRING_LEN];
@@ -34,15 +38,37 @@ unsigned long lastReport = 0;
 unsigned long lastMqttConnectionAttempt = 0;
 boolean pressed = false;
 
+int bikeLevel = 0;
+int bikeCadence = 0;
+int bikeRevs = 0;
+uint32_t bikeTime = 0;
+
 void IRAM_ATTR bikeInterrupt() {
   bike.cadenceInt();
 }
+
+void rmtShow(void) {
+  uint8_t *pixels = ws2812fx.getPixels();
+  uint16_t numBytes = ws2812fx.getNumBytes() + 1;
+  rmt_write_sample(RMT_CHANNEL_0, pixels, numBytes, false); // channel 0
+}
+
 
 void setup() 
 {
   Serial.begin(115200);
   Serial.println();
   Serial.println("Starting up...");
+
+  ws2812fx.init();
+  ws2812fx.setBrightness(64);
+  rmt_tx_int(RMT_CHANNEL_0, ws2812fx.getPin());
+  ws2812fx.setCustomShow(rmtShow);
+  ws2812fx.setSegment(0, 0, 2, FX_MODE_BREATH, BLUE,  1000, NO_OPTIONS);
+  ws2812fx.start();
+
+  bikeDisplay_setup();
+  bikeDisplay_toast("Welcome!", 3000);  
 
   webIF_setup();
   
@@ -60,9 +86,14 @@ void loop()
   webIF_doLoop();
   mqttClient.loop();
   bike.doLoop();
+  ws2812fx.service();
+  bikeDisplay_doLoop();
   
   if (needMqttConnect) {
+    ws2812fx.setSegment(0, 0, 2, FX_MODE_SCAN, RED,  1000, NO_OPTIONS);
     if (connectMqtt()) {
+      //ws2812fx.setSegment(0, 0, 2, FX_MODE_STATIC, BLACK,  1, NO_OPTIONS);
+      bikeDisplay_toast("MQTT OK!", 2000);
       needMqttConnect = false;
     }
   }
@@ -81,42 +112,55 @@ void loop()
 
   unsigned long now = millis();
   if (500 < now - lastReport) {
-    lastReport = now;
     
-    int valL = bike.getLevel();
+    bikeLevel = bike.getLevel();
     Serial.print("Level: ");
-    Serial.println(valL);
-    mqttClient.publish("/smartgymbike/level", String(valL));
+    Serial.println(bikeLevel);
+    mqttClient.publish("/smartgymbike/level", String(bikeLevel));
 
-    int valC = bike.getCadence();
+    bikeCadence = bike.getCadence();
     Serial.print("Cadence: ");
-    Serial.println(valC);
-    mqttClient.publish("/smartgymbike/cadence", String(valC));
+    Serial.println(bikeCadence);
+    mqttClient.publish("/smartgymbike/cadence", String(bikeCadence));
 
-    int valR = bike.getRevCount();
+    bikeRevs = bike.getRevCount();
     Serial.print("Rev count: ");
-    Serial.println(valR);
-    mqttClient.publish("/smartgymbike/revs", String(valR));
+    Serial.println(bikeRevs);
+    mqttClient.publish("/smartgymbike/revs", String(bikeRevs));
+
+    if (bikeCadence > 0) {
+      bikeTime = bikeTime + (now - lastReport);
+    }
+    
+    lastReport = now;
   }
 
-  if (bike.buttonPressed()) {
-
+  // Level buttons
+  if (bike.buttonUp.pressed() || bike.buttonDown.pressed()) {
     pressed = true;
-    if (bike.testButton(SmartGymBike::BUTTON_UP))
+    if (bike.buttonUp.pressed())
       bike.setLevel(SmartGymBike::LEVEL_MAX);
 
-    if (bike.testButton(SmartGymBike::BUTTON_DOWN))
+    if (bike.buttonDown.pressed())
       bike.setLevel(SmartGymBike::LEVEL_MIN);
+  } else {
+    if (pressed) {
+      pressed = false;
+      bike.levelStop();      
+    }
   }
 
-  if (pressed && !bike.buttonPressed()) {
-    pressed = false;
-    bike.levelStop();
+  // Reset button
+  if (bike.buttonSS.longPress(5000)) {
+     ESP.restart();
   }
+
 }
 
 void wifiConnected()
 {
+  Serial.println("WiFi connected.");
+  bikeDisplay_toast("WiFi OK!", 2000);
   needMqttConnect = true;
 }
 

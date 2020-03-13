@@ -32,6 +32,7 @@ void webIF_setup() {
     mqttUserNameValue[0] = '\0';
     mqttUserPasswordValue[0] = '\0';
   }
+  iotWebConf.setApTimeoutMs(5000);
   
   // -- Set up required URL handlers on the web server.
   server.on("/", webIF_handleRoot);

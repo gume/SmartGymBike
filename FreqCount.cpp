@@ -15,7 +15,7 @@ int FreqCounter::getRPM() {
 
   uint32_t now =  millis();
   uint32_t df = 0; uint32_t dc = 0; uint32_t dl = 0;
-  for (int i = 0; i < BUFFSIZE; i++) {
+  for (int i = 0; i < tbuffer.size(); i++) {
     uint32_t diff = now - tbuffer[i];
     if (diff > TOOOLD) continue;
     if (df == 0) df = tbuffer[i];
