@@ -143,7 +143,7 @@ void bikeDisplay_statScreen0() {
   bikeDisplay_writeCenter(String(bikeLevel), 30);
 
   // Display Cadence
-  bikeDisplay_writeCenter("RPM", 31);
+  bikeDisplay_writeCenter("RPM", 51);
   bikeDisplay_writeCenter(String(bikeCadence), 60);
 
   // Display Revs
