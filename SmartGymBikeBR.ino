@@ -29,15 +29,19 @@ char mqttUserNameValue[STRING_LEN];
 char mqttUserPasswordValue[STRING_LEN];
 
 boolean needMqttConnect = false;
-unsigned long lastReport = 0;
-unsigned long lastMqttConnectionAttempt = 0;
+uint32_t lastReport = 0;
+uint32_t lastMqttConnectionAttempt = 0;
 boolean pressed = false;
 boolean setupMode;
+uint32_t lastActiveTime = 0;
 
 int bikeLevel = 0;
 int bikeCadence = 0;
 int bikeRevs = 0;
+int pBikeRevs = 0;
 uint32_t bikeTime = 0;
+
+bool recoveryMode = false;
 
 void IRAM_ATTR bikeInterrupt() {
   bike.cadenceInt();
@@ -50,25 +54,38 @@ void setup()
   Serial.println();
   Serial.println("Starting up...");
 
+  setupMode = true;
+  webIF_setup();
+
+  if (bike.buttonPulse.pressed()) {
+    Serial.println("Recovery mode");
+    recoveryMode = true;
+    return;
+  }
+
   bikeLED_setup();
   bikeLED_breath(0x0000ff); // Blue
 
   bikeDisplay_setup();
   bikeDisplay_toast("Welc\nome!", 3000);  
-
-  setupMode = true;
-  webIF_setup();
   
   mqttClient.begin(mqttServerValue, net);
   mqttClient.onMessage(mqttMessageReceived);
 
   bike.setInterrupt(bikeInterrupt);
 
+  BleIF_setup();
+
   Serial.println("Ready.");
 }
 
 void loop() 
 {
+  if (recoveryMode) {
+    iotWebConf.doLoop();
+    return;
+  }
+
   // -- doLoop should be called as frequently as possible.
   webIF_doLoop();
   mqttClient.loop();
@@ -116,9 +133,16 @@ void loop()
     Serial.println(bikeRevs);
     mqttClient.publish("/smartgymbike/revs", String(bikeRevs));
 
+    if (bikeRevs > pBikeRevs) {
+      pBikeRevs = bikeRevs;
+      BleIF_update(bikeRevs);
+    }
+
     if (bikeCadence > 0) {
       bikeTime = bikeTime + (now - lastReport);
+      lastActiveTime = now;
     }
+    mqttClient.publish("/smartgymbike/time", String(bikeTime/1000));
     
     lastReport = now;
   }
@@ -167,6 +191,7 @@ boolean connectMqtt() {
     return false;
   }
   Serial.println("Connected!");
+  mqttClient.publish("/smartgymbike/info", "started");
 
   mqttClient.subscribe("/smartgymbike/control");
   return true;
@@ -184,8 +209,6 @@ boolean connectMqttOptions()
   else {
     result = mqttClient.connect(iotWebConf.getThingName());
   }
-
-  mqttClient.publish("/smartgymbike/debug", "MQTT started.");
   return result;
 }
 
@@ -200,6 +223,6 @@ void mqttMessageReceived(String &topic, String &payload)
   if (msg.containsKey("level")) {
     int target = msg["level"];
     bike.setLevel(target);
-    mqttClient.publish("/smartgymbike/debug", "level set to " + String(target));
+    mqttClient.publish("/smartgymbike/info", "level set to " + String(target));
   }
 }

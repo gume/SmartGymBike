@@ -2,10 +2,10 @@
 
 Button::Button(int p) {
   pin = p;
-  state = false;
+  pinMode(pin, INPUT_PULLUP);
+  state = digitalRead(pin);
   stateTime = millis();
   cbClick = NULL;
-  pinMode(pin, INPUT_PULLUP);
   hide = false;
 }
 
