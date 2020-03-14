@@ -8,8 +8,6 @@
 //      when connected to the Wifi it will turn off (kept HIGH).
 #define STATUS_PIN 2
 
-HTTPUpdateServer httpUpdater;
-
 IotWebConfParameter mqttServerParam = IotWebConfParameter("MQTT server", "mqttServer", mqttServerValue, STRING_LEN);
 IotWebConfParameter mqttUserNameParam = IotWebConfParameter("MQTT user", "mqttUser", mqttUserNameValue, STRING_LEN);
 IotWebConfParameter mqttUserPasswordParam = IotWebConfParameter("MQTT password", "mqttPass", mqttUserPasswordValue, STRING_LEN, "password");

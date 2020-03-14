@@ -42,23 +42,23 @@ void BleIF_setup() {
   pServer->setCallbacks(new BleIF_ServerCallbacks());
 
   BLEService *pService = pServer->createService((uint16_t)GattService::UUID_CYCLING_SPEED_AND_CADENCE);
-  BLECharacteristic *pCsc = pService->createCharacteristic(
-                 (uint16_t)GattCharacteristic::UUID_CSC_MEASUREMENT_CHAR,
-                 BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  pCsc = pService->createCharacteristic(
+           (uint16_t)GattCharacteristic::UUID_CSC_MEASUREMENT_CHAR,
+           BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
   pCsc->addDescriptor(new BLE2902());
-  BLECharacteristic *pCscFeat = pService->createCharacteristic(
-                 (uint16_t)GattCharacteristic::UUID_CSC_FEATURE_CHAR,
-                 BLECharacteristic::PROPERTY_READ);
+  pCscFeat = pService->createCharacteristic(
+           (uint16_t)GattCharacteristic::UUID_CSC_FEATURE_CHAR,
+           BLECharacteristic::PROPERTY_READ);
   uint16_t vf = 2;  // Crank counter only
   pCscFeat->setValue((uint8_t*)&vf, 2);
-  BLECharacteristic *pScLocation = pService->createCharacteristic(
-                 (uint16_t)GattCharacteristic::UUID_SENSOR_LOCATION_CHAR,
-                 BLECharacteristic::PROPERTY_READ);
+  pScLocation = pService->createCharacteristic(
+           (uint16_t)GattCharacteristic::UUID_SENSOR_LOCATION_CHAR,
+           BLECharacteristic::PROPERTY_READ);
   uint16_t vl = 6;  // LOCATION_RIGHT_CRANK
   pScLocation->setValue((uint8_t*)&vl, 1);
-  BLECharacteristic *pControlPoint = pService->createCharacteristic(
-                 (uint16_t)GattCharacteristic::UUID_SC_CONTROL_POINT_CHAR,
-                 BLECharacteristic::PROPERTY_WRITE);
+  pControlPoint = pService->createCharacteristic(
+           (uint16_t)GattCharacteristic::UUID_SC_CONTROL_POINT_CHAR,
+           BLECharacteristic::PROPERTY_WRITE);
   pService->start();               
 
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -70,10 +70,15 @@ void BleIF_setup() {
 
 void BleIF_update(uint16_t revs) {
 
-  uint16_t v[2];
-  v[0] = revs;
-  v[1] = (uint16_t) millis();
+  uint8_t v[5];
+  uint16_t revsx = (uint32_t)revs * (uint32_t)1024 / 1000;
+  uint16_t now16 = (uint16_t) millis();
+  v[0] = 2; // Crank only
+  v[1] = revsx % 256;
+  v[2] = revsx / 256;
+  v[3] = now16 % 256;
+  v[4] = now16 / 256;
   
-  pCsc->setValue((uint8_t*)&v, 4);
+  pCsc->setValue(v, 5);
   pCsc->notify();
 }

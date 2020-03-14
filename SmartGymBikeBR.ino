@@ -21,7 +21,7 @@ MQTTClient mqttClient;
 SmartGymBike bike;
 WebServer server(80);
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
-//RestRequestHandler restHandler;
+HTTPUpdateServer httpUpdater;
 
 #define STRING_LEN 128
 char mqttServerValue[STRING_LEN];
@@ -54,14 +54,15 @@ void setup()
   Serial.println();
   Serial.println("Starting up...");
 
-  setupMode = true;
-  webIF_setup();
-
   if (bike.buttonPulse.pressed()) {
     Serial.println("Recovery mode");
+    iotWebConf.setupUpdateServer(&httpUpdater);
     recoveryMode = true;
     return;
   }
+
+  setupMode = true;
+  webIF_setup();
 
   bikeLED_setup();
   bikeLED_breath(0x0000ff); // Blue
@@ -115,28 +116,24 @@ void loop()
     ESP.restart();
   }*/
 
+  bikeLevel = bike.getLevel();
+  bikeCadence = bike.getCadence();
+  bikeRevs = bike.getRevCount();
+
   unsigned long now = millis();
   if (500 < now - lastReport) {
     
-    bikeLevel = bike.getLevel();
     Serial.print("Level: ");
     Serial.println(bikeLevel);
     mqttClient.publish("/smartgymbike/level", String(bikeLevel));
 
-    bikeCadence = bike.getCadence();
     Serial.print("Cadence: ");
     Serial.println(bikeCadence);
     mqttClient.publish("/smartgymbike/cadence", String(bikeCadence));
 
-    bikeRevs = bike.getRevCount();
     Serial.print("Rev count: ");
     Serial.println(bikeRevs);
     mqttClient.publish("/smartgymbike/revs", String(bikeRevs));
-
-    if (bikeRevs > pBikeRevs) {
-      pBikeRevs = bikeRevs;
-      BleIF_update(bikeRevs);
-    }
 
     if (bikeCadence > 0) {
       bikeTime = bikeTime + (now - lastReport);
@@ -145,6 +142,12 @@ void loop()
     mqttClient.publish("/smartgymbike/time", String(bikeTime/1000));
     
     lastReport = now;
+  }
+
+  // Handle cadence notification
+  if (bikeRevs > pBikeRevs) {
+    BleIF_update(bikeRevs);
+    pBikeRevs = bikeRevs;
   }
 
   // Set LEDs
