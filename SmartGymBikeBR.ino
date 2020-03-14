@@ -93,7 +93,7 @@ void loop()
     ws2812fx.setSegment(0, 0, 2, FX_MODE_SCAN, RED,  1000, NO_OPTIONS);
     if (connectMqtt()) {
       //ws2812fx.setSegment(0, 0, 2, FX_MODE_STATIC, BLACK,  1, NO_OPTIONS);
-      bikeDisplay_toast("MQTT OK!", 2000);
+      bikeDisplay_toast("MQTT\nOK!", 2000);
       needMqttConnect = false;
     }
   }
@@ -131,6 +131,9 @@ void loop()
     if (bikeCadence > 0) {
       bikeTime = bikeTime + (now - lastReport);
     }
+    int ls = 5000-bikeCadence*40;
+    if (ls < 10) ls = 10;
+    ws2812fx.setSpeed(ls);
     
     lastReport = now;
   }
@@ -160,7 +163,7 @@ void loop()
 void wifiConnected()
 {
   Serial.println("WiFi connected.");
-  bikeDisplay_toast("WiFi OK!", 2000);
+  bikeDisplay_toast("WiFi\nOK!", 2000);
   needMqttConnect = true;
 }
 

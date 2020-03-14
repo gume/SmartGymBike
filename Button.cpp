@@ -4,18 +4,18 @@ Button::Button(int p) {
   pin = p;
   state = false;
   stateTime = millis();
-  click = false;
+  cbClick = NULL;
   pinMode(pin, INPUT_PULLUP);
+  hide = false;
 }
 
 bool Button::pressed() {
+  if (hide) return false;
   return state == LOW;
 }
 
-bool Button::clicked() {
-  bool rc = click;
-  click = false;
-  return rc;
+void Button::onClick(void (*handler)(int)) {
+  cbClick = handler;
 }
 
 bool Button::longPress(uint32_t durationms) {
@@ -31,8 +31,14 @@ void Button::check() {
 
   uint32_t now = millis();
   if (newState == HIGH) {  // Button released
-    if (now - stateTime > 50) click = true;
+    if ((now - stateTime > 50) && (stateTime != 0)) {
+      if (cbClick) cbClick(pin);
+    }
   }
   state = newState;
   stateTime = now;
+}
+
+void Button::hideState(bool h) {
+  hide = h;
 }

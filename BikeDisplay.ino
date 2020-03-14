@@ -15,7 +15,15 @@ uint32_t lastRefresh; // Last time display was refreshed
 uint32_t refreshInterval; // refresh period time
 
 int screenMode;  // Display various screens
+#define SCREENS 3
+typedef void (*screenCallback)();
+screenCallback screenInit[] = { NULL, NULL, &bikeDisplay_levelSetScreenInit };
+screenCallback screenLeave[] = { NULL, NULL, &bikeDisplay_levelSetScreenLeave };
 
+#define PRESETLEVELS 6
+int presetLevels[] = { 100, 1000, 1750, 2000, 2500, 3000 };
+int presetLevel = 0;
+  
 void bikeDisplay_setup() {
   
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x32
@@ -31,6 +39,8 @@ void bikeDisplay_setup() {
   refreshInterval = 500;  // 2 FPS
   event = false;
   screenMode = 0;
+
+  bike.buttonUser.onClick(&bikeDisplay_screenChange);
 }
 
 void bikeDisplay_doLoop() {
@@ -55,6 +65,12 @@ void bikeDisplay_doLoop() {
   switch (screenMode) {
   case 0:
     bikeDisplay_statScreen0();
+    break;
+  case 1:
+    bikeDisplay_statScreen1();
+    break;
+  case 2:
+    bikeDisplay_levelSetScreen();
     break;
   }
   
@@ -90,48 +106,115 @@ void bikeDisplay_toast(String message, uint32_t duration) {
   display.display();
 }
 
-void bikeDisplay_statScreen0() {
+void bikeDisplay_showBikeTime(int ypos) {
 
-  display.clearDisplay();
   // Display bikeTime
   int h = bikeTime / 1000 / 60 / 60;
   int m = (bikeTime / 1000 / 60) % 60;
   int s = (bikeTime / 1000) % 60;
   if (h > 0) {
-    display.setCursor(0, 0);
+    display.setCursor(0, ypos);
     display.write(String(h).c_str());
-    display.setCursor(4,0);
+    display.setCursor(4,ypos);
     display.write(":");
   }
   String ms = "0";
   if (m > 9) ms = String(m);
   else ms = ms + String(m);
-  display.setCursor(8,0);
+  display.setCursor(8,ypos);
   display.write(ms.c_str());
-  display.setCursor(17,0);
+  display.setCursor(17,ypos);
   display.write(":");
   String ss = "0";
   if (s > 9) ss = String(s);
   else ss = ss + String(s);
-  display.setCursor(21,0);
+  display.setCursor(21,ypos);
   display.write(ss.c_str());
-  display.drawLine(0, 9, 31, 9, SSD1306_WHITE);
+  display.drawLine(0, 9+ypos, 31, 9+ypos, SSD1306_WHITE);
+}
 
+void bikeDisplay_statScreen0() {
+
+  display.clearDisplay();
+  bikeDisplay_showBikeTime(0);
+  
   // Display Level
-  display.setCursor(3,11);
-  display.write("Level");
-  display.setCursor(3,19);
-  display.write(String(bikeLevel).c_str());
+  bikeDisplay_writeCenter("Level", 21);
+  bikeDisplay_writeCenter(String(bikeLevel), 30);
 
   // Display Cadence
-  display.setCursor(3,31);
-  display.write("RPM");
-  display.setCursor(3,39);
-  display.write(String(bikeCadence).c_str());
+  bikeDisplay_writeCenter("RPM", 31);
+  bikeDisplay_writeCenter(String(bikeCadence), 60);
 
   // Display Revs
-  display.setCursor(3,51);
-  display.write("Revs");
-  display.setCursor(3,59);
-  display.write(String(bikeRevs).c_str());
+  bikeDisplay_writeCenter("Revs", 81);
+  bikeDisplay_writeCenter(String(bikeRevs), 90);
+}
+
+void bikeDisplay_statScreen1() {
+
+  display.clearDisplay();
+  bikeDisplay_showBikeTime(0);
+
+  // Three bars
+  bikeDisplay_drawProgressbarH(1, 12, 14, 85, bikeLevel/32);
+  bikeDisplay_drawProgressbarH(17, 12, 14, 85, bikeCadence-20);
+  bikeDisplay_writeCenter(String(bikeRevs), 105);
+}
+
+void bikeDisplay_levelSetScreen() {
+
+  display.clearDisplay();
+  display.setTextSize(3);
+  display.setCursor(0,30);
+  display.write(String("L"+String(presetLevel)).c_str());
+  display.setTextSize(1);
+  bikeDisplay_writeCenter(String(presetLevels[presetLevel]), 70);
+}
+
+void bikeDisplay_levelSetScreenInit() {
+  bike.buttonUp.hideState(true);
+  bike.buttonUp.onClick(bikeDisplay_levelChange);
+  bike.buttonDown.hideState(true);
+  bike.buttonDown.onClick(bikeDisplay_levelChange);
+  bike.buttonSS.hideState(true);
+  bike.buttonSS.onClick(bikeDisplay_levelChange);
+}
+
+void bikeDisplay_levelSetScreenLeave() {
+  bike.buttonUp.hideState(false);
+  bike.buttonUp.onClick(NULL);
+  bike.buttonDown.hideState(false);
+  bike.buttonDown.onClick(NULL);  
+  bike.buttonSS.hideState(false);
+  bike.buttonSS.onClick(NULL);
+}
+
+void bikeDisplay_levelChange(int bp) {
+  if (bp == PIN_BTNU) {
+    if (++presetLevel >= PRESETLEVELS) presetLevel = 0;
+  }
+  else if (bp == PIN_BTND) {
+    if (--presetLevel < 0) presetLevel = PRESETLEVELS - 1;
+  }
+  bike.setLevel(presetLevels[presetLevel]);
+}
+
+void bikeDisplay_screenChange(int bp) {
+  if (screenLeave[screenMode]) screenLeave[screenMode]();
+  if (++screenMode >= SCREENS) screenMode = 0;
+  if (screenInit[screenMode]) screenInit[screenMode]();
+}
+
+void bikeDisplay_drawProgressbarH(int x,int y, int width, int height, int progress) {
+   progress = progress > 100 ? 100 : progress; // set the progress value to 100
+   progress = progress < 0 ? 0 :progress; // start the counting to 0-100
+   int bar = ((height-4) * progress) / 100;
+   display.drawRect(x, y, width, height, SSD1306_WHITE);
+   display.fillRect(x+2, y+height-2-bar, width-4, bar, SSD1306_WHITE);
+}
+
+void bikeDisplay_writeCenter(String text, int ypos) {
+  display.setCursor(16-(text.length()*5/2),ypos);
+  display.write(text.c_str());
 }
