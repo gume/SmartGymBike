@@ -15,10 +15,14 @@ uint32_t lastRefresh; // Last time display was refreshed
 uint32_t refreshInterval; // refresh period time
 
 int screenMode;  // Display various screens
-#define SCREENS 3
-typedef void (*screenCallback)();
-screenCallback screenInit[] = { NULL, NULL, &bikeDisplay_levelSetScreenInit };
-screenCallback screenLeave[] = { NULL, NULL, &bikeDisplay_levelSetScreenLeave };
+#define SCREENS 5
+typedef void (*screenCallBack)();
+screenCallBack screenDisplay[] = { &bikeDisplay_statScreen0,
+  &bikeDisplay_statScreen1, &bikeDisplay_statScreen2,
+  &bikeDisplay_levelSetScreen, &bikeDisplay_aboutScreen};
+screenCallBack screenInit[] = { NULL, NULL, NULL, &bikeDisplay_levelSetScreenInit, NULL };
+screenCallBack screenLeave[] = { NULL, NULL, NULL, &bikeDisplay_levelSetScreenLeave, NULL };
+
 
 #define PRESETLEVELS 6
 int presetLevels[] = { 100, 1000, 1750, 2000, 2500, 3000 };
@@ -62,17 +66,7 @@ void bikeDisplay_doLoop() {
     return;
   }
 
-  switch (screenMode) {
-  case 0:
-    bikeDisplay_statScreen0();
-    break;
-  case 1:
-    bikeDisplay_statScreen1();
-    break;
-  case 2:
-    bikeDisplay_levelSetScreen();
-    break;
-  }
+  screenDisplay[screenMode]();
   
   // Display FPS
   int fps10 = 10000 / (now - lastRefresh);
@@ -162,6 +156,27 @@ void bikeDisplay_statScreen1() {
   bikeDisplay_writeCenter(String(bikeRevs), 105);
 }
 
+void bikeDisplay_statScreen2() {
+
+  int m = (bikeTime / 1000 / 60) % 60;
+  int s = (bikeTime / 1000) % 60;
+
+  String ms = "0";
+  if (m > 9) ms = String(m);
+  else ms = ms + String(m);
+  String ss = "0";
+  if (s > 9) ss = String(s);
+  else ss = ss + String(s);
+    
+  display.clearDisplay();
+  display.setTextSize(3);
+  display.setCursor(0, 40);
+  display.write(ms.c_str());  
+  display.setCursor(0, 70);
+  display.write(ss.c_str());
+  display.setTextSize(1);
+}
+
 void bikeDisplay_levelSetScreen() {
 
   display.clearDisplay();
@@ -170,6 +185,20 @@ void bikeDisplay_levelSetScreen() {
   display.write(String("L"+String(presetLevel)).c_str());
   display.setTextSize(1);
   bikeDisplay_writeCenter(String(presetLevels[presetLevel]), 70);
+}
+
+void bikeDisplay_aboutScreen() {
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.write("Version");
+  display.setCursor(0,10);
+  display.write(bikeRikeVersion);
+  display.setCursor(0,20);
+  display.write("IP");
+  display.setCursor(0,30);
+  display.write(WiFi.localIP());
 }
 
 void bikeDisplay_levelSetScreenInit() {

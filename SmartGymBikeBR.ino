@@ -23,6 +23,8 @@ WebServer server(80);
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
 HTTPUpdateServer httpUpdater;
 
+#define bikeRikeVersion "0.0317"
+
 #define STRING_LEN 128
 char mqttServerValue[STRING_LEN];
 char mqttUserNameValue[STRING_LEN];
@@ -74,7 +76,6 @@ void setup()
   mqttClient.onMessage(mqttMessageReceived);
 
   bike.setInterrupt(bikeInterrupt);
-
   BleIF_setup();
 
   Serial.println("Ready.");
@@ -125,26 +126,29 @@ void loop()
     
     Serial.print("Level: ");
     Serial.println(bikeLevel);
-    mqttClient.publish("/smartgymbike/level", String(bikeLevel));
 
     Serial.print("Cadence: ");
     Serial.println(bikeCadence);
-    mqttClient.publish("/smartgymbike/cadence", String(bikeCadence));
 
     Serial.print("Rev count: ");
     Serial.println(bikeRevs);
-    mqttClient.publish("/smartgymbike/revs", String(bikeRevs));
 
     if (bikeCadence > 0) {
       bikeTime = bikeTime + (now - lastReport);
       lastActiveTime = now;
     }
-    mqttClient.publish("/smartgymbike/time", String(bikeTime/1000));
-    
+
+    if (mqttClient.connected()) {
+      mqttClient.publish("/smartgymbike/level", String(bikeLevel));
+      mqttClient.publish("/smartgymbike/cadence", String(bikeCadence));
+      mqttClient.publish("/smartgymbike/revs", String(bikeRevs));
+      mqttClient.publish("/smartgymbike/time", String(bikeTime/1000));
+    }
+        
     lastReport = now;
   }
 
-  // Handle cadence notification
+  // Handle cadence notification for BLE
   if (bikeRevs > pBikeRevs) {
     BleIF_update(bikeRevs);
     pBikeRevs = bikeRevs;
@@ -195,7 +199,6 @@ boolean connectMqtt() {
   }
   Serial.println("Connected!");
   mqttClient.publish("/smartgymbike/info", "started");
-
   mqttClient.subscribe("/smartgymbike/control");
   return true;
 }
